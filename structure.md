@@ -221,15 +221,151 @@ f.constructor === F; // true
 
 原型和原型链定义   
     prototype is a property of a funtion, that references an object.   
+
+想要弄清楚原型和原型链，这几个属性必须要搞清楚，__proto__、prototype、 constructor。   
+其次你要知道js中对象和函数的关系，函数其实是对象的一种。   
+最后你要知道函数、构造函数的区别，任何函数都可以作为构造函数，但是并不能将任意函数叫做构造函数，只有当一个函数通过new关键字调用的时候才可以成为构造函数   
+1.__proto__、 constructor属性是对象所独有的；   
+2.prototype属性是函数独有的；   
+3.上面说过js中函数也是对象的一种，那么函数同样也有属性__proto__、 constructor；   
+
+
+prototype设计之初就是为了实现继承，让由特定函数创建的所有实例共享属性和方法，也可以说是让某一个构造函数实例化的所有对象可以找到公共的方法和属性。有了prototype我们不需要为每一个实例创建重复的属性方法，而是将属性方法创建在构造函数的原型对象上（prototype）。那些不需要共享的才创建在构造函数中。
+
+![alt text](https://segmentfault.com/img/remote/1460000021232136)
+
+__proto__属性相当于通往prototype（“琅琊福地”）唯一的路（指针）
+__proto__属性是对象（包括函数）独有的， 它的含义就是告诉我们一个对象的原型对象是谁。
+
+![alt text](https://segmentfault.com/img/remote/1460000021232139)
+```js
+p1.__proto__ === Parent.prototype; // true
+```
+
+万物继承自Object.prototype。这也就是为什么我们可以实例化一个对象，并且可以调用该对象上没有的属性和方法了。如：
+```js
+//我们并没有在Parent中定义任何方法属性，但是我们可以调用
+p1.toString();//hasOwnProperty 等等的一些方法
+```
+现在引出原型链的概念，当我们调用p1.toString()的时候，先在p1对象本身寻找，没有找到则通过p1.__proto__找到了原型对象Parent.prototype，也没有找到，又通过Parent.prototype.__proto__找到了上一层原型对象Object.prototype。在这一层找到了toString方法。返回该方法供p1使用。
+当然如果找到Object.prototype上也没找到，就在Object.prototype.__proto__中寻找，但是Object.prototype.__proto__ === null所以就返回undefined。这就是为什么当访问对象中一个不存在的属性时，返回undefined了。   
+
+constructor属性是让“徒弟”、“徒孙” 们知道是谁创造了自己，这里可不是“师父”啊
+而是自己的父母，父母创造了自己，父母又是由上一辈人创造的，……追溯到头就是Function() 【女娲】。   
+constructor是对象才有的属性，从图中看到它是从一个对象指向一个函数的。指向的函数就是该对象的构造函数。
+![alt text](https://segmentfault.com/img/remote/1460000021232138)
+
+它的作用是从一个对象指向一个函数，这个函数就是该对象的构造函数。通过栗子我们可以看到，p1的constructor属性指向了Parent，那么Parent就是p1的构造函数。同样Parent的constructor属性指向了Function，那么Function就是Parent的构造函数，然后又验证了Function就是根构造函数。
+
+bug:
+constructor属性本质上是只有prototype对象才有的，也就是构造函数.prototype.contructor === 该构造函数，而实例对象之所以也有，只是通过__proto__继承来自其构造函数的原型对象。
+所以p1 => Parent() => Function()这里的contructor属性应该用虚线表示，注明来自继承得来。
+```js
+p1.hasOwnProperty('constructor') // false
+Parent.prototype.hasOwnProperty('constructor') // true
+```
+
+
+
     By default, the prototype object will have a constructor property which points to the original function or the class that the instance was created from.
+
     So when you try to access leo.constructor, leo doesn’t have a constructor property so it will delegate that lookup to Animal.prototype which indeed does have a constructor property.
+
     The way that instanceof works is it checks for the presence of constructor.prototype in the object’s prototype chain. In the example above, leo instanceof Animal is true because Object.getPrototypeOf(leo) === Animal.prototype. In addition, leo instanceof User is false because Object.getPrototypeOf(leo) !== User.prototype.
+
     Arrow functions don’t have their own this keyword. As a result, arrow functions can’t be constructor functions and if you try to invoke an arrow function with the new keyword, it’ll throw an error.
     arrow functions also don’t have a prototype property.
-继承
+
 
 
 # 作用域和闭包
+
+作用域：
+
+    全局作用域
+        带有关键字 var 的声明
+---
+    函数作用域
+        立即执行函数：
+        这是个很实用的函数，很多库都用它分离全局作用域，形成一个单独的函数作用域；
+ ```html
+ <script type="text/javascript">
+     (function() {
+     var testValue = 123;
+     var testFunc = function () { console.log('just test'); };
+     })();
+     console.log(window.testValue);		// undefined
+     console.log(window.testFunc);		// undefined
+ </script>
+ ````
+        复制代码它能够自动执行 (function() { //... })() 里面包裹的内容，能够很好地消除全局变量的影响；
+---
+    块级作用域
+        如果想要实现 块级作用域 那么我们需要用 let, const 关键字声明！！！
+```js
+    for(let i = 0; i < 5; i++) {
+        // ...
+    }
+    console.log(i)				// 报错：ReferenceError: i is not defined
+```
+        在 for 循环执行完毕之后 i 变量就被释放了，它已经消失了！！！
+
+```js
+//problem
+for(var i = 0; i < 5; i++) {
+  setTimeout(function() {
+     console.log(i);			// 5 5 5 5 5
+  }, 200);
+};
+
+//solution 1 create 5 function scope
+for(var i = 0; i < 5; i++) {
+  abc(i);
+};
+
+function abc(i) {
+  setTimeout(function() {
+     console.log(i);			// 0 1 2 3 4 
+  }, 200); 
+}
+
+//solution 2 create 5 value
+for(var i = 0; i < 5; i++) {
+  (function(j) {
+    setTimeout(function() {
+      console.log(j);
+    }, 200);
+  })(i);
+};
+
+//solution 3 block scope
+for(let i = 0; i < 5; i++) {
+    setTimeout(function() {
+      console.log(i);
+    }, 200);
+};
+```
+
+    词法作用域 (Lexical scope) 
+![alt text](https://user-gold-cdn.xitu.io/2018/3/28/1626ce92a304bc47?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+```js
+var testValue = 'outer';
+function foo() {
+  console.log(testValue);		// "outer"
+}
+function bar() {
+  var testValue = 'inner';
+  foo();
+}
+bar();    //"outer"
+```
+![alt text](https://user-gold-cdn.xitu.io/2018/3/28/1626ce99fad0f0ea?imageView2/0/w/1280/h/960/format/webp/ignore-error/1)
+
+---
+    动态作用域 动态作用域跟 this 引用机制相关
+        动态作用域，作用域是基于调用栈的，而不是代码中的作用域嵌套；
+        作用域嵌套，有词法作用域一样的特性，查找变量时，总是寻找最近的作用域；
+
 
 执行上下文
 this
