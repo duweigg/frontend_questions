@@ -367,7 +367,6 @@ bar();    //"outer"
         作用域嵌套，有词法作用域一样的特性，查找变量时，总是寻找最近的作用域；
 
 
-执行上下文
 this
 闭包
 
@@ -405,20 +404,45 @@ TCP, UDP 的区别，  最佳场景
 
 
 # 安全相关
-
+https://juejin.cn/post/6844903781704925191
 ## XSS
 xss = 代码注入  
 XSS 攻击可分为存储型、反射型和 DOM 型三种。
 存储型-> database
 反射型-> redirect
-DOM  -> 
+DOM  -> DOM 型 XSS 跟前两种 XSS 的区别：DOM 型 XSS 攻击中，取出和执行恶意代码由浏览器端完成，属于前端 JavaScript 自身的安全漏洞，而其他两种 XSS 都属于服务端的安全漏洞。
+
+类型	存储区	插入点
+存储型 XSS	后端数据库	HTML
+反射型 XSS	URL	HTML
+DOM 型 XSS	后端数据库/前端存储/URL	前端 JavaScript
+
 
 预防:
 
-关键字过滤，   
-长度限制，   
-白名单   
-escapeHTML() 转义：
+httpOnly: 在 cookie 中设置 HttpOnly 属性后，js脚本将无法读取到 cookie 信息。
+
+
+输入过滤: 一般是用于对于输入格式的检查，例如：邮箱，电话号码，用户名，密码……等，按照规定的格式输入。不仅仅是前端负责，后端也要做相同的过滤检查。因为攻击者完全可以绕过正常的输入流程，直接利用相关接口向服务器发送设置。
+
+
+转义 HTML: 如果拼接 HTML 是必要的，就需要对于引号，尖括号，斜杠进行转义,但这还不是很完善.想对 HTML 模板各处插入点进行充分的转义,就需要采用合适的转义库.(可以看下这个库,还是中文的)
+function escape(str) {
+  str = str.replace(/&/g, '&amp;')
+  str = str.replace(/</g, '&lt;')
+  str = str.replace(/>/g, '&gt;')
+  str = str.replace(/"/g, '&quto;')
+  str = str.replace(/'/g, '&#39;')
+  str = str.replace(/`/g, '&#96;')
+  str = str.replace(/\//g, '&#x2F;')
+  return str
+}
+复制代码
+
+白名单: 对于显示富文本来说，不能通过上面的办法来转义所有字符，因为这样会把需要的格式也过滤掉。这种情况通常采用白名单过滤的办法，当然也可以通过黑名单过滤，但是考虑到需要过滤的标签和标签属性实在太多，更加推荐使用白名单的方式。
+
+
+ 
 
 React 会将所有要显示到 DOM 的字符串转义，防止 XSS
 解决过度转义（特殊符号）
@@ -428,7 +452,45 @@ https://segmentfault.com/a/1190000012299682
 小明为了加快网页的加载速度，把一个数据通过 JSON 的方式内联到 HTML 中
 escapeEmbedJSON() 函数
 
-## CSRF
+## CSRF跨站请求伪造   
+你这可以这么理解CSRF攻击：攻击者盗用了你的身份，以你的名义发送恶意请求。CSRF能够做的事情包括：以你名义发送邮件，发消息，盗取你的账号，甚至于购买商品，虚拟货币转账......造成的问题包括：个人隐私泄露以及财产安全。
+
+　　从上图可以看出，要完成一次CSRF攻击，受害者必须依次完成两个步骤：
+
+　　1.登录受信任网站A，并在本地生成Cookie。
+
+　　2.在不登出A的情况下，访问危险网站B。
+
+CSRF攻击是源于WEB的隐式身份验证机制！WEB的身份验证机制虽然可以保证一个请求是来自于某个用户的浏览器，但却无法保证该请求是用户批准发送的
+
+防范
+
+验证码；强制用户必须与应用进行交互，才能完成最终请求。此种方式能很好的遏制 csrf，但是用户体验比较差。
+
+
+Referer check；请求来源限制，此种方法成本最低，但是并不能保证 100% 有效，因为服务器并不是什么时候都能取到 Referer，而且低版本的浏览器存在伪造 Referer 的风险。
+
+
+token；token 验证的 CSRF 防御机制是公认最合适的方案。(具体可以查看本系列前端鉴权中对token有详细描述)若网站同时存在 XSS 漏洞的时候，这个方法也是空谈。
+
+
+要抵御 CSRF，关键在于在请求中放入黑客所不能伪造的信息，并且该信息不存在于 cookie 之中。可以在 HTTP 请求中以参数的形式加入一个随机产生的 token，并在服务器端建立一个拦截器来验证这个 token，如果请求中没有 token 或者 token 内容不正确，则认为可能是 CSRF 攻击而拒绝该请求。
+
+服务端在收到路由请求时，生成一个随机数，在渲染请求页面时把随机数埋入页面（一般埋入 form 表单内，<input type="hidden" name="_csrf_token" value="xxxx">）   
+服务端设置setCookie，把该随机数作为cookie或者session种入用户浏览器   
+当用户发送 GET 或者 POST 请求时带上_csrf_token参数（对于 Form 表单直接提交即可，因为会自动把当前表单内所有的 input 提交给后台，包括_csrf_token）   
+后台在接受到请求后解析请求的cookie获取_csrf_token的值，然后和用户请求提交的_csrf_token做个比较，如果相等表示请求是合法的。   
+Token 保存在 Session 中。假如 Token 保存在 Cookie 中，用户浏览器开了很多页面。在一些页面 Token 被使用消耗掉后新的Token 会被重新种入，但那些老的 Tab 页面对应的 HTML 里还是老 Token。这会让用户觉得为啥几分钟前打开的页面不能正常提交？   
+尽量少用 GET。假如攻击者在我们的网站上传了一张图片，用户在加载图片的时候实际上是向攻击者的服务器发送了请求，这个请求会带有referer表示当前图片所在的页面的 url。 而如果使用 GET 方式接口的话这个 URL 就形如： https://xxxx.com/gift?giftId=aabbcc&_csrf_token=xxxxx
+，那相当于攻击者就获取了_csrf_token，短时间内可以使用这个 token 来操作其他 GET 接口。
+
+https://www.cnblogs.com/hyddd/archive/2009/04/09/1432744.html
+
+
+CSRF与 XSS 区别
+
+通常来说 CSRF 是由 XSS 实现的，CSRF 时常也被称为 XSRF（CSRF 实现的方式还可以是直接通过命令行发起请求等）。
+本质上讲，XSS 是代码注入问题，CSRF 是 HTTP 问题。 XSS 是内容没有过滤导致浏览器将攻击者的输入当代码执行。CSRF 则是因为浏览器在发送 HTTP 请求时候自动带上 cookie，而一般网站的 session 都存在 cookie里面(Token验证可以避免)。
 
 
 # 浏览器缓存策略
@@ -469,9 +531,164 @@ DFS
 # 项目架构经验等
 # 如何设计一个好的组件
 # 节流，防抖
+## 防抖
+应用场景:
+两个条件:   
+1,如果客户连续的操作会导致频繁的事件回调(可能引起页面卡顿).   
+2,客户只关心"最后一次"操作(也可以理解为停止连续操作后)所返回的结果.   
+例如:
+输入搜索联想，用户在不断输入值时，用防抖来节约请求资源。    
+按钮点击:收藏,点赞,心标等   
+
+防抖分为两种:
+
+1)非立即执行版:事件触发->延时->执行回调函数;如果在延时中,继续触发事件,则会重新进行延时.在延时结束后执行回调函数.常见例子:就是input搜索框,客户输完过一会就会自动搜索
+2)立即执行版:事件触发->执行回调函数->延时;如果在延时中,继续触发事件,则会重新进行延时.在延时结束后,并不会执行回调函数.常见例子:就是对于按钮防点击.例如点赞,心标,收藏等有立即反馈的按钮.
+```js
+//非立即执行版:
+//首先准备我们要使用的回调函数
+function shotCat (content) {
+  console.log('shotCat出品,必属精品!必须点赞!(滑稽)')
+}
+
+//然后准备包装函数:
+//1,保存定时器标识 
+//2,返回闭包函数: 1)对定时器的判断清除;2)一般还需要保存函数的参数(一般就是事件返回的对象)和上下文(定时器存在this隐式丢失,详情可以看我不知道的js上)
+//最后补充一句,这里不建议通过定义一个全局变量来替代闭包保存定时器标识.
+function debounce(fun, delay = 500) {
+//let timer = null 保存定时器
+    return function (args) {
+        let that = this
+        let _args = args
+		//这里对定时器的设置有两种方法,第一种就是将定时器保存在函数(函数也是对象)的属性上,
+		//这种写法,很简便,但不是很常用
+        clearTimeout(fun.timer)
+        fun.timer = setTimeout(function () {
+            fun.call(that, _args)
+        }, delay)
+		//另外一种写法就是我们比较常见的
+		//if (timer) clearTimeout(timer);     相比上面的方法,这里多一个判断
+		//timer = setTimeout(function () {
+        //    fun.call(that, _args)
+        //}, delay)
+    }
+}
+ //接着用变量保存保存 debounce 返回的带有延时功能的函数
+let debounceShotCat = debounce(shotCat, 500)  
+
+//最后添加事件监听 回调debounceShotCat 并传入事件返回的对象
+let input = document.getElementById('debounce')
+input.addEventListener('keyup', function (e) {
+        debounceShotCat(e.target.value)
+})
 
 
-作者：皮小蛋
-链接：https://juejin.cn/post/6844903961518931981
-来源：掘金
-著作权归作者所有。商业转载请联系作者获得授权，非商业转载请注明出处。
+
+//带有立即执行选项的防抖函数:
+//思路和上面的大致相同,如果是立即执行,则定时器中不再包含回调函数,而是在回调函数执行后,仅起到延时和重置定时器标识的作用
+function debounce(fun, delay = 500,immediate = true) {
+    let timer = null //保存定时器
+    return function (args) {
+        let that = this
+        let _args = args
+		if (timer) clearTimeout(timer);  //不管是否立即执行都需要首先清空定时器
+        if (immediate) {
+		    if ( !timer) fun.apply(that, _args)  //如果定时器不存在,则说明延时已过,可以立即执行函数
+			//不管上一个延时是否完成,都需要重置定时器
+            timer = setTimeout(function(){
+                timer = null; //到时间后,定时器自动设为null,不仅方便判断定时器状态还能避免内存泄露
+            }, delay)
+        }
+        else {
+		//如果是非立即执行版,则重新设定定时器,并将回调函数放入其中
+            timer = setTimeout(function(){
+                fun.call(that, _args)
+            }, delay);
+        }
+    }
+}
+```
+## 节流
+应用场景:   
+两个条件:   
+1,客户连续频繁地触发事件    
+2,客户不再只关心"最后一次"操作后的结果反馈.而是在操作过程中持续的反馈.   
+例如:   
+
+鼠标不断点击触发，点击事件在规定时间内只触发一次(单位时间内只触发一次)   
+监听滚动事件，比如是否滑到底部自动加载更多，用throttle来判断   
+
+节流有两种实现方式
+
+时间戳方式:通过闭包保存上一次的时间戳,然后与事件触发的时间戳比较.如果大于规定时间,则执行回调.否则就什么都不处理.
+
+
+特点:一般第一次会立即执行，之后连续频繁地触发事件，也是超过了规定时间才会执行一次。最后一次触发事件，也不会执行(说明:如果你最后一次触发时间大于规定时间,这样就算不上连续频繁触发了).
+
+
+定时器方式:原理与防抖类似.通过闭包保存上一次定时器状态.然后事件触发时,如果定时器为null(即代表此时间隔已经大于规定时间),则设置新的定时器.到时间后执行回调函数,并将定时器置为null.
+
+
+特点:当第一次触发事件时，不会立即执行函数，到了规定时间后才会执行。 之后连续频繁地触发事件，也是到了规定时间才会执行一次(因为定时器)。当最后一次停止触发后，由于定时器的延时，还会执行一次回调函数(那也是上一次成功成功触发执行的回调,而不是你最后一次触发产生的)。一句话总结就是延时回调,你能看到的回调都是上次成功触发产生的,而不是你此刻触发产生的.
+
+
+说明: 这两者最大的区别:是时间戳版的函数触发是在规定时间开始的时候，而定时器版的函数触发是在规定时间结束的时候。 其他差异可以看我加粗的字. 具体理解请结合后面的代码实例,
+```js
+//时间戳版：
+//这里fun指的就是回调函数,我就不写出来了
+function throttle(fun, delay = 500) {
+    let previous = 0;  //记录上一次触发的时间戳.这里初始设为0,是为了确保第一次触发产生回调
+    return function(args) {
+        let now = Date.now(); //记录此刻触发时的时间戳
+        let that = this;
+        let _args = args;
+        if (now - previous > delay) {  //如果时间差大于规定时间,则触发
+            fun.apply(that, _args);
+            previous = now;
+        }
+    }
+}
+
+
+//定时器版:
+function throttle(fun, delay = 500) {
+    let timer;
+    return function(args) {
+        let that = this;
+        let _args = args;
+        if (!timer) {  //如果定时器不存在,则设置新的定时器,到时后,才执行回调,并将定时器设为null
+            timer = setTimeout(function(){
+                timer = null;
+                fun.apply(that, _args)
+            }, delay)
+        }
+
+    }
+}
+
+
+
+
+//时间戳+定时器版: 实现第一次触发可以立即响应,结束触发后也能有响应 (该版才是最符合实际工作需求)
+//该版主体思路还是时间戳版,定时器的作用仅仅是执行最后一次回调
+function throttle(fun, delay = 500) {
+     let timer = null;
+     let previous = 0;
+     return function(args) {
+             let now = Date.now();
+             let remaining = delay - (now - previous); //距离规定时间,还剩多少时间
+             let that = this;
+             let _args = args;
+             clearTimeout(timer);  //清除之前设置的定时器
+              if (remaining <= 0) {
+                    fun.apply(that, _args);
+                    previous = Date.now();
+              } else {
+                    timer = setTimeout(function(){
+                    fun.apply(that, _args)
+            }, remaining); //因为上面添加的clearTimeout.实际这个定时器只有最后一次才会执行
+              }
+      }
+}
+
+```
